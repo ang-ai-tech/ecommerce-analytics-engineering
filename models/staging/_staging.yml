@@ -1,0 +1,105 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: One row per customer, newest version only, with cleaned e-mail.
+    columns:
+      - name: customer_id
+        data_tests: [unique, not_null]
+      - name: email
+        description: Lower case, without spaces.
+        data_tests: [not_null]
+      - name: country_code
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["IT", "DE", "FR", "ES", "NL"]
+      - name: is_test_account
+        description: "True for internal QA accounts (e-mail domain from the `test_email_domain` var)."
+
+  - name: stg_products
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+      - name: current_unit_price
+        description: Today's price. The price actually paid is on the order item.
+        data_tests: [not_null, non_negative]
+
+  - name: stg_orders
+    description: One row per order with a single spelling for each status.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: customer_id
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["completed", "cancelled", "refunded"]
+      - name: channel
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["web", "app"]
+
+  - name: stg_order_items
+    columns:
+      - name: order_item_id
+        data_tests: [unique, not_null]
+      - name: order_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
+      - name: product_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('stg_products')
+                field: product_id
+      - name: quantity
+        data_tests: [not_null, non_negative]
+      - name: amount
+        description: quantity x unit price.
+        data_tests: [not_null, non_negative]
+
+  - name: stg_web_events
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+      - name: session_id
+        data_tests: [not_null]
+      - name: event_type
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["page_view", "add_to_cart", "begin_checkout", "purchase"]
+
+unit_tests:
+  - name: test_order_status_spellings_are_unified
+    description: Every known spelling becomes one status; anything else becomes 'unknown'.
+    model: stg_orders
+    given:
+      - input: source('shop', 'orders')
+        rows:
+          - {order_id: "1", status: "completed"}
+          - {order_id: "2", status: "Completed"}
+          - {order_id: "3", status: "COMPLETE"}
+          - {order_id: "4", status: "Canceled"}
+          - {order_id: "5", status: " refunded "}
+          - {order_id: "6", status: "lost"}
+    expect:
+      rows:
+        - {order_id: 1, status: "completed"}
+        - {order_id: 2, status: "completed"}
+        - {order_id: 3, status: "completed"}
+        - {order_id: 4, status: "cancelled"}
+        - {order_id: 5, status: "refunded"}
+        - {order_id: 6, status: "unknown"}

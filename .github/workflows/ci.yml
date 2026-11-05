@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: pytest
+
+      # First load: only the data known at 30 June 2026
+      - run: shopdata generate --until 2026-06-30
+      - run: dbt build
+
+      # Second load: the full period. fct_web_events only adds the new events.
+      - run: shopdata generate
+      - run: dbt build
+
+      - run: dbt docs generate

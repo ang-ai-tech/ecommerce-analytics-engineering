@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: rpt_monthly_sales
+    description: Monthly KPIs on completed orders. Definitions in docs/metrics.md.
+    columns:
+      - name: order_month
+        data_tests: [unique, not_null]
+      - name: revenue
+        data_tests: [non_negative]
+  - name: rpt_category_sales
+    description: Units and revenue per category and month (completed orders only).
+  - name: rpt_cohort_retention
+    description: Share of each monthly cohort that buys again N months after the first purchase.
+    columns:
+      - name: retention_rate
+        description: active_customers / cohort_customers (always 1.0 in month 0, by definition).
+  - name: rpt_funnel_monthly
+    description: Visits reaching cart, checkout and purchase per month.
+    columns:
+      - name: session_month
+        data_tests: [unique, not_null]

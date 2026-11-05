@@ -1,0 +1,32 @@
+name: shop_analytics
+version: "1.0.0"
+config-version: 2
+profile: shop_analytics
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["data_tests"]
+clean-targets: ["target", "dbt_packages"]
+
+on-run-start:
+  - "{{ create_raw_views() }}"
+
+vars:
+  # Folder with the CSV files written by `shopdata generate`.
+  raw_data_path: "data/raw"
+  # Internal QA accounts place test orders that must never reach reporting.
+  test_email_domain: "qa.example.com"
+  # Incremental web events: re-read the last N days to catch late-arriving events.
+  events_lookback_days: 3
+
+models:
+  shop_analytics:
+    staging:
+      +materialized: view
+      +schema: staging
+    intermediate:
+      +materialized: view
+      +schema: intermediate
+    marts:
+      +materialized: table
+      +schema: marts

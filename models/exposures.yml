@@ -1,0 +1,17 @@
+version: 2
+
+exposures:
+  - name: sales_dashboard
+    label: Sales dashboard
+    type: dashboard
+    maturity: medium
+    url: http://localhost:8501
+    description: Streamlit dashboard with KPIs, cohorts and the purchase funnel (dashboard/app.py).
+    depends_on:
+      - ref('rpt_monthly_sales')
+      - ref('rpt_category_sales')
+      - ref('rpt_cohort_retention')
+      - ref('rpt_funnel_monthly')
+      - ref('dim_customers')
+    owner:
+      name: Analytics team

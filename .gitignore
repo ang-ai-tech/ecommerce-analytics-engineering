@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Generated data: run `shopdata generate` and `dbt build`
+data/raw/
+data/*.duckdb
+data/*.duckdb.wal
+
+# dbt
+target/
+dbt_packages/
+logs/
+.user.yml

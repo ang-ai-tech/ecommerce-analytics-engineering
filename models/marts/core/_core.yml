@@ -1,0 +1,142 @@
+version: 2
+
+models:
+  - name: fct_orders
+    description: >
+      One row per order of a real customer. Revenue is the order amount for completed
+      orders and 0 for cancelled or refunded ones.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: order_id
+        data_type: integer
+        constraints: [{type: not_null}, {type: primary_key}]
+        data_tests: [unique]
+      - name: customer_id
+        data_type: integer
+        constraints: [{type: not_null}]
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_customers')
+                field: customer_id
+      - name: ordered_at
+        data_type: timestamp
+      - name: order_date
+        data_type: date
+      - name: status
+        data_type: varchar
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["completed", "cancelled", "refunded"]
+      - name: channel
+        data_type: varchar
+      - name: number_of_units
+        data_type: integer
+      - name: order_amount
+        data_type: decimal(12, 2)
+        data_tests: [not_null, non_negative]
+      - name: is_completed
+        data_type: boolean
+      - name: revenue
+        data_type: decimal(12, 2)
+        data_tests: [non_negative]
+      - name: purchase_number
+        data_type: integer
+        description: 1 for the customer's first completed order, 2 for the second... Empty if not completed.
+      - name: is_first_purchase
+        data_type: boolean
+
+  - name: dim_customers
+    description: One row per real customer (test accounts excluded) with a purchase summary.
+    config:
+      contract:
+        enforced: true
+    columns:
+      - name: customer_id
+        data_type: integer
+        constraints: [{type: not_null}, {type: primary_key}]
+        data_tests: [unique]
+      - name: email
+        data_type: varchar
+      - name: country_code
+        data_type: varchar
+      - name: created_at
+        data_type: timestamp
+      - name: first_purchase_at
+        data_type: timestamp
+      - name: last_purchase_at
+        data_type: timestamp
+      - name: completed_orders
+        data_type: integer
+        data_tests: [non_negative]
+      - name: lifetime_revenue
+        data_type: decimal(12, 2)
+        data_tests: [non_negative]
+      - name: cohort_month
+        data_type: date
+        description: Month of the first completed order.
+      - name: customer_type
+        data_type: varchar
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["no purchase", "one-time", "repeat"]
+
+  - name: dim_products
+    columns:
+      - name: product_id
+        data_tests: [unique, not_null]
+
+  - name: fct_order_items
+    columns:
+      - name: order_item_id
+        data_tests: [unique, not_null]
+      - name: category
+        data_tests: [not_null]
+
+  - name: fct_web_events
+    description: All website and app events, loaded incrementally.
+    columns:
+      - name: event_id
+        data_tests: [unique, not_null]
+
+  - name: fct_sessions
+    description: One row per visit with the furthest funnel step reached.
+    columns:
+      - name: session_id
+        data_tests: [unique, not_null]
+      - name: order_id
+        description: The order placed in the visit, if any.
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('fct_orders')
+                field: order_id
+
+unit_tests:
+  - name: test_customer_type_and_cohort
+    description: >
+      No completed order = 'no purchase', one = 'one-time', two or more = 'repeat';
+      cancelled orders do not count; the cohort is the month of the first completed order.
+    model: dim_customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: 1, is_test_account: false}
+          - {customer_id: 2, is_test_account: false}
+          - {customer_id: 3, is_test_account: false}
+          - {customer_id: 4, is_test_account: true}
+      - input: ref('fct_orders')
+        rows:
+          - {customer_id: 2, ordered_at: "2026-03-10 10:00:00", is_completed: true, revenue: 50}
+          - {customer_id: 3, ordered_at: "2026-01-20 09:00:00", is_completed: true, revenue: 30}
+          - {customer_id: 3, ordered_at: "2026-02-05 18:00:00", is_completed: true, revenue: 20}
+          - {customer_id: 1, ordered_at: "2026-01-01 12:00:00", is_completed: false, revenue: 0}
+    expect:
+      rows:
+        - {customer_id: 1, completed_orders: 0, cohort_month: null, customer_type: "no purchase"}
+        - {customer_id: 2, completed_orders: 1, cohort_month: "2026-03-01", customer_type: "one-time"}
+        - {customer_id: 3, completed_orders: 2, cohort_month: "2026-01-01", customer_type: "repeat"}

@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: int_orders
+    description: Orders of real customers (test accounts removed) with lines, units and amount.
+    columns:
+      - name: order_id
+        data_tests: [unique, not_null]
+      - name: order_amount
+        description: Sum of the order lines. Every order has at least one line.
+        data_tests: [not_null]
